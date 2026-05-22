@@ -7670,6 +7670,26 @@ function removeFromCart(idx) {
   if (cartItems.length === 0) closeCartDrawer();
 }
 
+/* 將購物車某一列數量直接設為指定值（從輸入框觸發） */
+function setCartItemQty(idx, value) {
+  const ci = cartItems[idx];
+  if (!ci) return;
+  if (orderIsShippingCartLine_(ci)) {
+    renderCartItems();
+    return;
+  }
+  let n = parseInt(String(value).replace(/\D/g, ''), 10);
+  if (!Number.isFinite(n) || n < 1) n = 1;
+  if (n > 999) n = 999;
+  const cur = parseInt(ci.qty, 10) || 1;
+  const delta = n - cur;
+  if (delta === 0) {
+    renderCartItems();
+    return;
+  }
+  adjustCartItemQty(idx, delta);
+}
+
 function adjustCartItemQty(idx, delta) {
   const ci = cartItems[idx];
   if (!ci) return;
@@ -7809,7 +7829,11 @@ function renderCartItems() {
       <div class="cart-item-bottom">
         <div class="cart-qty-ctrl">
           <div class="cart-qty-btn" onclick="adjustCartItemQty(${idx}, -1)">−</div>
-          <span class="cart-qty-num">${ci.qty}</span>
+          <input class="cart-qty-num" type="number" inputmode="numeric" min="1" max="999"
+                 value="${ci.qty}"
+                 onfocus="this.select()"
+                 onchange="setCartItemQty(${idx}, this.value)"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
           <div class="cart-qty-btn" onclick="adjustCartItemQty(${idx}, 1)">+</div>
         </div>
         <span class="cart-item-price">${priceInner}</span>
