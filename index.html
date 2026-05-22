@@ -1891,12 +1891,10 @@
     width: 100%;
     box-sizing: border-box;
   }
-  /* 字級放大後需更高上限，否則 overflow:hidden 會截斷匯款／宅配說明 */
+  /* 匯款／宅配說明：完整展開，區塊內不捲動 */
   .cart-hd-pay-slide.is-open {
-    max-height: min(72vh, 56rem);
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    max-height: none;
+    overflow: visible;
     margin-bottom: 0.65rem;
   }
   .cart-hd-pay-slide-inner {
@@ -2490,9 +2488,8 @@
     color: #D70464;
   }
   .cart-group-card .cart-hd-pay-slide.is-open {
-    max-height: min(72vh, 56rem) !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
   .cart-group-card .cart-hd-pay-slide-inner {
     background: linear-gradient(135deg,#eff6ff,#e0f2fe) !important;
@@ -2754,6 +2751,27 @@
     width: 1.85rem !important;
     height: 1.85rem !important;
     font-size: 1rem !important;
+  }
+
+  /* 商家資訊：字級對齊「宅配與付款規則」的標題／內文 */
+  #store-info-sheet .si-label {
+    font-size: 1.25rem !important;
+    line-height: 1.35 !important;
+    color: #0f172a !important;
+    font-weight: 800 !important;
+    margin-bottom: 0.35rem !important;
+  }
+  #store-info-sheet .si-value,
+  #store-info-sheet .si-value.si-value--prewrap,
+  #store-info-sheet .si-value a,
+  #store-info-sheet .si-addr-text,
+  #store-info-sheet .si-store-promo-btn {
+    font-size: 1.15rem !important;
+    line-height: 1.55 !important;
+    font-weight: 700 !important;
+  }
+  #store-info-sheet .si-icon {
+    font-size: 1.15rem !important;
   }
 </style>
 <style id="order-synth-inline">
@@ -7998,23 +8016,13 @@ function orderUpdateHdPayHint_() {
   orderSyncHdPaySlideHeight_();
 }
 
-/** 依匯款／宅配說明實際高度撐開藍框，避免字放大後被 max-height 截斷 */
+/** 購物車匯款區改由 CSS 完整展開，清除舊版動態 max-height／捲動 */
 function orderSyncHdPaySlideHeight_() {
   var slide = document.getElementById('cart-hd-pay-slide');
-  var inner = document.getElementById('cart-hd-pay-slide-inner');
-  if (!slide || !inner || !slide.classList.contains('is-open')) return;
-  var cap = Math.min(Math.floor(window.innerHeight * 0.72), 896);
-  var sync = function () {
-    var need = inner.scrollHeight + 12;
-    if (need < 48) need = 48;
-    slide.style.maxHeight = Math.min(need, cap) + 'px';
-    slide.style.overflowY = need > cap ? 'auto' : 'hidden';
-  };
-  if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(sync);
-  } else {
-    setTimeout(sync, 0);
-  }
+  if (!slide) return;
+  slide.style.maxHeight = '';
+  slide.style.overflowY = '';
+  slide.style.overflow = '';
 }
 
 function orderInitFulfillmentForm_() {
