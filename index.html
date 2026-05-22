@@ -4493,9 +4493,7 @@ function orderFetchMerchantIntro_() {
       var data = null;
       try { data = text ? JSON.parse(text) : null; } catch (eJ) { data = null; }
       window.__merchantIntroCache = orderNormalizeMerchantIntro_(data);
-      if (allProducts && allProducts.length) {
-        try { renderMenu(); } catch (eRmIntro) { /* 略 */ }
-      }
+      try { renderMenu(); } catch (eRmIntro) { /* 略 */ }
     })
     .catch(function (err) {
       console.warn('[order] getMerchantIntro', err);
@@ -6802,14 +6800,42 @@ async function loadMenuData_() {
 function orderFinishMenuLoadingUi_() {
   var _ml = document.getElementById('menu-loading');
   var _mc = document.getElementById('menu-content');
+  orderTruckStopProgress_(false);
+  try { orderTruckSetProgress_(0); } catch (eZ) {}
+  var _tr = document.getElementById('order-wait-panel-truck');
+  if (_tr) {
+    _tr.hidden = true;
+    _tr.setAttribute('aria-hidden', 'true');
+    _tr.classList.remove('order-wait-truck--on');
+  }
+  var _synth = document.getElementById('order-wait-panel-synth');
+  if (_synth) {
+    _synth.hidden = true;
+    _synth.setAttribute('aria-hidden', 'true');
+    _synth.classList.remove('order-wait-synth--on');
+  }
   if (_ml) {
-    orderTruckStopProgress_(true);
     _ml.style.display = 'none';
     _ml.setAttribute('aria-busy', 'false');
   }
-  orderWaitShowCapybara_();
-  if (_mc) _mc.style.display = '';
+  if (_mc) {
+    _mc.style.display = '';
+    _mc.classList.add('menu-content--visible');
+  }
   try { orderResumePromoAdAfterHomepageVisible_(); } catch (ePromo) { /* 略 */ }
+}
+
+function orderRevealMenuContent_() {
+  var _ml = document.getElementById('menu-loading');
+  var _mc = document.getElementById('menu-content');
+  if (_ml) {
+    _ml.style.display = 'none';
+    _ml.setAttribute('aria-busy', 'false');
+  }
+  if (_mc) {
+    _mc.style.display = '';
+    _mc.classList.add('menu-content--visible');
+  }
 }
 
 var orderInitialReadyState_ = {
@@ -7019,6 +7045,10 @@ function renderMenu() {
       if (phMenu && currentWebAppUrl) void orderFetchMemberProfile_(phMenu);
     }
   } catch (eRm) {}
+
+  if (orderInitialReadyState_.loadingClosed) {
+    orderRevealMenuContent_();
+  }
 
   _cacheScrollRefs();
   orderUpdateSectionTitleHighlight_(0);
