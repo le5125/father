@@ -1904,7 +1904,7 @@
     word-break: break-word;
   }
   .cart-hd-pay-slide-inner .cart-hd-pay-h {
-    font-size: 0.9rem;
+    font-size: inherit;
     font-weight: 800;
     color: #075985;
     margin: 0 0 0.45rem;
@@ -1994,26 +1994,6 @@
     user-select: none; pointer-events: none;
   }
 
-  #order-line-profile-badge {
-    position: fixed; left: var(--hero-icon-edge, 0.5714rem); bottom: 5.5rem; z-index: 87;
-    max-width: min(72vw, 16rem);
-    display: none; align-items: center; gap: 0.5rem;
-    padding: 0.5rem 0.65rem; border-radius: 0.75rem;
-    background: rgba(255,255,255,.94);
-    box-shadow: 0 0.15rem 0.5rem rgba(0,0,0,.12);
-    border: 2px solid var(--panda-light);
-  }
-  #order-line-profile-badge.show { display: flex; }
-  #order-line-profile-badge img {
-    width: 2.25rem; height: 2.25rem; border-radius: 50%; object-fit: cover; flex-shrink: 0;
-  }
-  #order-line-profile-badge .olpb-name {
-    font-size: 0.85rem; font-weight: 800; color: #1a1a1a;
-    line-height: 1.25; word-break: break-all;
-  }
-  #order-line-profile-badge .olpb-hint {
-    font-size: 0.7rem; color: #64748b; margin-top: 0.1rem;
-  }
 </style>
 
 <!-- V2 設計（與原版一致） -->
@@ -2504,6 +2484,18 @@
     border-color: #7dd3fc !important;
     border-radius: 7px !important;
     padding: 9px 10px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    line-height: 1.5 !important;
+    color: #0f172a !important;
+  }
+  .cart-group-card .cart-hd-pay-slide-inner .cart-hd-pay-h,
+  .cart-group-card .cart-hd-pay-slide-inner div,
+  .cart-group-card .cart-hd-pay-slide-inner span {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    line-height: 1.5 !important;
+    color: #0f172a !important;
   }
 
   /* --- 表單欄位：input 樣式升級，字級保留 17px（原本） ---
@@ -3515,7 +3507,7 @@
       <div class="shop-logo-container" id="hero-logo-wrap" style="display:none;" aria-hidden="true">
         <img id="hero-shop-logo" src="" alt="">
       </div>
-      <h1 id="hero-shop-name" style="font-size:81px;font-weight:900;color:white;line-height:1.15;margin:0;flex:1;min-width:0;text-shadow:0 2px 6px rgba(0,0,0,.35);">載入中...</h1>
+      <h1 id="hero-shop-name" style="font-weight:900;color:white;line-height:1.2;margin:0;flex:1;min-width:0;">載入中...</h1>
     </div>
   </div>
 </div>
@@ -3793,14 +3785,6 @@
   </div>
 </div>
 
-<div id="order-line-profile-badge" aria-live="polite" hidden>
-  <img id="order-line-profile-avatar" src="" alt="" width="52" height="52" hidden>
-  <div class="olpb-text">
-    <div class="olpb-name" id="order-line-profile-name"></div>
-    <div class="olpb-hint">已透過 LINE 登入</div>
-  </div>
-</div>
-
 <div id="menu-content" class="pb-safe" style="display:none;"></div>
 
 <div id="order-scroll-top-wrap" class="order-scroll-top-wrap" hidden aria-hidden="true">
@@ -4051,33 +4035,19 @@ function orderGetLineDisplayNameForSubmit_() {
   }
 }
 
-function orderUpdateLineProfileBadge_() {
-  var badge = document.getElementById('order-line-profile-badge');
-  var nameEl = document.getElementById('order-line-profile-name');
-  var av = document.getElementById('order-line-profile-avatar');
-  if (!badge || !nameEl) return;
-  var nm = orderGetLineDisplayNameForSubmit_();
-  var uid = orderGetLineUserIdForMemberBind_();
-  if (!uid) {
-    badge.hidden = true;
-    badge.classList.remove('show');
-    badge.setAttribute('aria-hidden', 'true');
-    return;
-  }
-  nameEl.textContent = nm || 'LINE 會員';
-  badge.hidden = false;
-  badge.classList.add('show');
-  badge.setAttribute('aria-hidden', 'false');
-  var pic = '';
-  try { pic = String(window.__ORDER_LINE_PICTURE_URL__ || '').trim(); } catch (eP) {}
-  if (av && pic) {
-    av.src = pic;
-    av.alt = nm || 'LINE';
-    av.hidden = false;
-  } else if (av) {
-    av.hidden = true;
-    av.removeAttribute('src');
-  }
+function orderEnsureMemberStubFromLine_() {
+  var lineId = orderGetLineUserIdForMemberBind_();
+  if (!lineId || !currentWebAppUrl) return Promise.resolve();
+  var lineName = orderGetLineDisplayNameForSubmit_();
+  var url = orderWebAppGetActionUrl_('ensureMemberStubByLineId', 'lineId=' + encodeURIComponent(lineId));
+  if (lineName) url += '&lineName=' + encodeURIComponent(lineName);
+  if (!url) return Promise.resolve();
+  return fetch(url, { method: 'GET', cache: 'no-store', credentials: 'omit' })
+    .then(function (r) { return r.json(); })
+    .catch(function (e) {
+      console.warn('[shoporder] ensureMemberStubByLineId', e);
+      return null;
+    });
 }
 
 async function orderFetchLiffIdFromBackend_() {
@@ -4123,8 +4093,8 @@ async function orderInitLiffGithub_() {
   var prof = await liff.getProfile();
   window.__ORDER_LINE_USER_ID__ = String(prof.userId || '').trim();
   window.__ORDER_LINE_DISPLAY_NAME__ = String(prof.displayName || '').trim();
-  window.__ORDER_LINE_PICTURE_URL__ = String(prof.pictureUrl || '').trim();
-  orderUpdateLineProfileBadge_();
+  try { delete window.__ORDER_LINE_PICTURE_URL__; } catch (ePic) {}
+  void orderEnsureMemberStubFromLine_();
   return { ok: true, profile: prof };
 }
 
@@ -4545,6 +4515,20 @@ function orderGetStoredMemberPhone10_() {
 function orderApplyMemberPhoneLockToForm_() {
   var el = document.getElementById('order-phone');
   var hdEl = document.getElementById('order-hd-phone');
+  /* GitHub LIFF 版：購物車不預填電話，由顧客自行輸入 */
+  if (ORDER_GITHUB_LIFF_PAGE) {
+    if (el) {
+      el.value = '';
+      el.readOnly = false;
+      el.classList.remove('order-phone-locked');
+    }
+    if (hdEl) {
+      hdEl.value = '';
+      hdEl.readOnly = false;
+      hdEl.classList.remove('order-phone-locked');
+    }
+    return;
+  }
   var p = orderGetStoredMemberPhone10_();
   if (p && window.__ORDER_MEMBER_SYSTEM_ENABLED__) {
     if (el) {
@@ -7975,16 +7959,16 @@ function orderUpdateHdPayHint_() {
       parts.push('<div style="margin-top:7px;">' + orderEscHtml_(txt).replace(/\n/g, '<br>') + '</div>');
     }
     if (parts.length <= 1) {
-      parts.push('<div style="margin-top:5px;color:#64748b;font-size:11px;">店家尚未填寫匯款／宅配說明，下單後請留意通知或來電確認。</div>');
+      parts.push('<div style="margin-top:5px;color:#64748b;">店家尚未填寫匯款／宅配說明，下單後請留意通知或來電確認。</div>');
     }
   } else {
     parts.push('<div class="cart-hd-pay-h">貨到付款</div>');
     if (orderShowCodFeeBlockOnOrder_(rules)) {
       var codAmtCart = parseInt(rules.codFeeAmount, 10) || 0;
       if (codAmtCart > 0) {
-        parts.push('<div style="font-size:12px;line-height:1.5;margin-top:4px;">宅配收取"代收手續費" <strong>NT$ ' + codAmtCart + '</strong> 元。</div>');
+        parts.push('<div style="margin-top:4px;">宅配收取"代收手續費" <strong>NT$ ' + codAmtCart + '</strong> 元。</div>');
       } else {
-        parts.push('<div style="font-size:12px;line-height:1.5;margin-top:4px;color:#64748b;">代收手續費金額依店家通知為準。</div>');
+        parts.push('<div style="margin-top:4px;color:#64748b;">代收手續費金額依店家通知為準。</div>');
       }
     }
   }
