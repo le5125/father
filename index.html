@@ -2452,6 +2452,8 @@
     font-weight: 900;
     color: #D70464;
   }
+  /* 芒果產期不固定：自取／宅配日期由系統自動（下單後 5 天），消費者不填 */
+  .order-auto-date-field { display: none !important; }
 
   /* --- 付款方式 segmented control 升級（字級保留 13px） --- */
   .cart-group-card .cart-hd-pay-bar {
@@ -3957,9 +3959,9 @@
           <span class="cart-group-title-icon is-green">📅</span>
           <span>自取資訊</span>
         </div>
-        <div class="cart-order-phone-block" style="margin-bottom:9px;">
-          <label class="cart-hd-field-label" style="font-size:28px;font-weight:700;color:#555;display:block;margin-bottom:8px;">自取日期 <span style="color:var(--panda);">*必填</span></label>
-          <input id="order-pickup-date" type="date" class="form-input" oninput="this.classList.remove('error')">
+        <div class="cart-order-phone-block order-auto-date-field" style="margin-bottom:9px;" aria-hidden="true">
+          <label class="cart-hd-field-label" style="font-size:28px;font-weight:700;color:#555;display:block;margin-bottom:8px;">自取日期</label>
+          <input id="order-pickup-date" type="date" class="form-input" tabindex="-1">
         </div>
         <div class="cart-order-phone-block" style="margin-bottom:9px;">
           <label class="cart-hd-field-label" style="font-size:28px;font-weight:700;color:#555;display:block;margin-bottom:8px;">
@@ -3980,8 +3982,10 @@
           <span class="cart-group-title-icon is-blue">🚚</span>
           <span>宅配資訊</span>
         </div>
-        <label class="cart-hd-field-label" style="font-size:28px;font-weight:700;color:#555;display:block;margin-bottom:8px;">配送日期 <span style="color:var(--panda);">*必填</span></label>
-        <input id="order-hd-date" type="date" class="form-input" oninput="this.classList.remove('error')">
+        <div class="order-auto-date-field" aria-hidden="true">
+          <label class="cart-hd-field-label" style="font-size:28px;font-weight:700;color:#555;display:block;margin-bottom:8px;">配送日期</label>
+          <input id="order-hd-date" type="date" class="form-input" tabindex="-1">
+        </div>
         <label class="cart-hd-field-label" style="font-size:28px;font-weight:700;color:#555;display:block;margin-bottom:8px;">姓名 <span style="color:var(--panda);">*必填</span></label>
         <input id="order-hd-name" type="text" placeholder="收件人姓名" class="form-input" oninput="this.classList.remove('error')">
         <label class="cart-hd-field-label" style="font-size:28px;font-weight:700;color:#555;display:block;margin-bottom:8px;">電話 <span style="color:var(--panda);">*必填</span></label>
@@ -7911,10 +7915,25 @@ function orderLocalYmd_(d) {
   return x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate());
 }
 
-function orderDefaultHdDateStr_() {
+/** 下單後預設出貨／自取／宅配日期（天數，芒果產期不固定故不讓客人選） */
+var ORDER_AUTO_SHIP_DAYS_AFTER_ = 5;
+
+function orderDefaultShipDateStr_() {
   var d = new Date();
-  d.setDate(d.getDate() + 1);
+  d.setDate(d.getDate() + ORDER_AUTO_SHIP_DAYS_AFTER_);
   return orderLocalYmd_(d);
+}
+
+function orderDefaultHdDateStr_() {
+  return orderDefaultShipDateStr_();
+}
+
+function orderEnsureAutoShipDates_() {
+  var ymd = orderDefaultShipDateStr_();
+  var pDate = document.getElementById('order-pickup-date');
+  var dEl = document.getElementById('order-hd-date');
+  if (pDate) pDate.value = ymd;
+  if (dEl) dEl.value = ymd;
 }
 
 function orderGetDeliveryRulesObj_() {
@@ -8050,10 +8069,7 @@ function orderSyncHdPaySlideHeight_() {
 }
 
 function orderInitFulfillmentForm_() {
-  var pDate = document.getElementById('order-pickup-date');
-  if (pDate && !String(pDate.value || '').trim()) pDate.value = orderLocalYmd_(new Date());
-  var dEl = document.getElementById('order-hd-date');
-  if (dEl && !String(dEl.value || '').trim()) dEl.value = orderDefaultHdDateStr_();
+  orderEnsureAutoShipDates_();
   var tr = document.getElementById('order-hd-pay-transfer');
   if (tr) tr.checked = true;
   orderUpdateHdPayOptVisual_();
@@ -8130,6 +8146,7 @@ function submitOrder() {
 
   var phone;
   var notesBase = '';
+  orderEnsureAutoShipDates_();
   var fulfillMode = orderGetFulfillmentMode_();
   var homeDeliveryObj = null;
   var pickupTimeStr = '';
@@ -8142,15 +8159,7 @@ function submitOrder() {
       if (phoneElPu) { phoneElPu.classList.add('error'); phoneElPu.focus(); }
       return;
     }
-    var pDateEl = document.getElementById('order-pickup-date');
-    var pickupYmd = pDateEl ? String(pDateEl.value || '').trim() : '';
-    if (!pickupYmd) {
-      showToast('❗ 請選擇自取日期');
-      if (pDateEl) { pDateEl.classList.add('error'); pDateEl.focus(); }
-      return;
-    }
-    if (pDateEl) pDateEl.classList.remove('error');
-    pickupTimeStr = pickupYmd;
+    pickupTimeStr = orderDefaultShipDateStr_();
     var p10pick = orderNormalizePhone10_(phone);
     if (p10pick) phone = p10pick;
   } else {
@@ -8159,20 +8168,16 @@ function submitOrder() {
     var hdPhoneEl = document.getElementById('order-hd-phone');
     var hdAddrEl = document.getElementById('order-hd-address');
     var hdNotesEl = document.getElementById('order-hd-notes');
-    var dStr = hdDateEl ? String(hdDateEl.value || '').trim() : '';
+    var dStr = orderDefaultShipDateStr_();
+    if (hdDateEl) hdDateEl.value = dStr;
     var nStr = hdNameEl ? String(hdNameEl.value || '').trim() : '';
     phone = hdPhoneEl ? String(hdPhoneEl.value || '').trim() : '';
     var aStr = hdAddrEl ? String(hdAddrEl.value || '').trim() : '';
     notesBase = hdNotesEl ? String(hdNotesEl.value || '').trim() : '';
-    ['order-hd-date', 'order-hd-name', 'order-hd-phone', 'order-hd-address'].forEach(function (id) {
+    ['order-hd-name', 'order-hd-phone', 'order-hd-address'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.classList.remove('error');
     });
-    if (!dStr) {
-      showToast('❗ 請選擇配送日期');
-      if (hdDateEl) { hdDateEl.classList.add('error'); hdDateEl.focus(); }
-      return;
-    }
     if (!nStr) {
       showToast('❗ 請填寫姓名');
       if (hdNameEl) { hdNameEl.classList.add('error'); hdNameEl.focus(); }
