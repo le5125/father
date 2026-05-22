@@ -45,7 +45,7 @@
     overflow-x: visible;
   }
   html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
     overscroll-behavior-y: none;
   }
   body {
@@ -153,7 +153,7 @@
     height: clamp(8.8rem, 28vh, 22.5rem);
     background: linear-gradient(135deg, #1a0a10 0%, #3d0622 40%, #D70464 100%);
     position: relative; overflow: hidden;
-    transition: height 0.35s cubic-bezier(.4,0,.2,1);
+    transition: none;
         --hero-icon-size: 3rem;
     --hero-icon-gap-x: 0.5rem;
     --hero-icon-top: 0.5714rem;
@@ -6348,6 +6348,10 @@ let _scrollSections   = []; // section 元素陣列
 let _scrollCatTabs    = []; // cat-tab 元素陣列
 let _lastActiveCat    = 0;
 let _scrollRafPending = false;
+let _heroCollapsed    = false;
+var ORDER_HERO_COLLAPSE_Y_ = 100;
+var ORDER_HERO_EXPAND_Y_   = 40;
+var ORDER_SCROLL_NEAR_BOTTOM_PX_ = 140;
 
 function _cacheScrollRefs() {
   _scrollHeroBanner = document.getElementById('hero-banner');
@@ -6355,6 +6359,7 @@ function _cacheScrollRefs() {
   _scrollSections   = Array.from(document.querySelectorAll('[data-section]'));
   _scrollCatTabs    = Array.from(document.querySelectorAll('.cat-tab'));
   _lastActiveCat    = 0;
+  _heroCollapsed    = _scrollHeroBanner ? _scrollHeroBanner.classList.contains('collapsed') : false;
 }
 
 function orderScrollToTop_() {
@@ -6387,6 +6392,45 @@ function orderUpdateScrollTopBtn_() {
   }
 }
 
+/** Hero 收合時補償 scrollY，避免整頁高度突變造成閃跳 */
+function orderSetHeroCollapsed_(wantCollapse, scrollY) {
+  if (!_scrollHeroBanner) return;
+  wantCollapse = !!wantCollapse;
+  if (wantCollapse === _heroCollapsed) return;
+  var prevH = _scrollHeroBanner.offsetHeight;
+  _scrollHeroBanner.classList.toggle('collapsed', wantCollapse);
+  _heroCollapsed = wantCollapse;
+  var delta = prevH - _scrollHeroBanner.offsetHeight;
+  if (delta > 0 && scrollY > ORDER_HERO_EXPAND_Y_) {
+    window.scrollTo(0, Math.max(0, scrollY - delta));
+  }
+}
+
+function orderSyncHeroCollapsedOnScroll_(scrollY) {
+  if (!_scrollHeroBanner) return;
+  var docH = document.documentElement.scrollHeight;
+  var nearBottom = (scrollY + window.innerHeight) >= (docH - ORDER_SCROLL_NEAR_BOTTOM_PX_);
+  if (nearBottom) return;
+  var want = _heroCollapsed
+    ? scrollY > ORDER_HERO_EXPAND_Y_
+    : scrollY > ORDER_HERO_COLLAPSE_Y_;
+  orderSetHeroCollapsed_(want, scrollY);
+}
+
+function orderSyncActiveCategoryOnScroll_() {
+  if (!_scrollSections.length || !_scrollCatTabsEl) return;
+  var catH = _scrollCatTabsEl.offsetHeight || 0;
+  var edge = catH + 20;
+  var current = 0;
+  _scrollSections.forEach(function (sec, i) {
+    if (sec.getBoundingClientRect().top <= edge) current = i;
+  });
+  if (current === _lastActiveCat) return;
+  _lastActiveCat = current;
+  _scrollCatTabs.forEach(function (t, i) { t.classList.toggle('active', i === current); });
+  orderUpdateSectionTitleHighlight_(current);
+}
+
 window.addEventListener('scroll', () => {
   _pageScrolling = true;
   clearTimeout(_pageScrollTimer);
@@ -6397,27 +6441,9 @@ window.addEventListener('scroll', () => {
   _scrollRafPending = true;
   requestAnimationFrame(() => {
     _scrollRafPending = false;
-    const scrollY = window.scrollY;
-
-    if (_scrollHeroBanner) {
-      if (scrollY > 60) {
-        _scrollHeroBanner.classList.add('collapsed');
-      } else {
-        _scrollHeroBanner.classList.remove('collapsed');
-      }
-    }
-
-    if (_scrollSections.length > 0 && _scrollCatTabsEl) {
-      const catH = _scrollCatTabsEl.offsetHeight;
-      const threshold = scrollY + catH + 16;
-      let current = 0;
-      _scrollSections.forEach((sec, i) => { if (sec.offsetTop < threshold) current = i; });
-      if (current !== _lastActiveCat) {
-        _lastActiveCat = current;
-        _scrollCatTabs.forEach((t, i) => t.classList.toggle('active', i === current));
-        orderUpdateSectionTitleHighlight_(current);
-      }
-    }
+    var scrollY = window.scrollY;
+    orderSyncHeroCollapsedOnScroll_(scrollY);
+    orderSyncActiveCategoryOnScroll_();
   });
 }, { passive: true });
 
@@ -7125,12 +7151,13 @@ function scrollToSection(idx) {
 
   const sec = document.querySelector(`[data-section="${idx}"]`);
   if (sec) {
+    orderSetHeroCollapsed_(true, window.scrollY);
     const catTabsEl = document.getElementById('cat-tabs');
     const catH  = catTabsEl ? catTabsEl.offsetHeight : 100;
     const stickyH = catH;
     const rawOffset = sec.getBoundingClientRect().top + window.scrollY - stickyH - 4;
-    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-    const safeOffset = Math.min(Math.max(0, rawOffset), maxScroll - 100);
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const safeOffset = Math.min(Math.max(0, rawOffset), maxScroll);
     window.scrollTo({ top: safeOffset, behavior: 'smooth' });
   }
   document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
@@ -7634,12 +7661,16 @@ function updateCartBar() {
 
   const bar = document.getElementById('cart-bar');
   if (totalQty > 0) {
+    var wasShown = bar.classList.contains('show');
     bar.classList.add('show');
-    bar.classList.remove('bounce');
-    void bar.offsetWidth;
-    bar.classList.add('bounce');
+    if (!wasShown) {
+      bar.classList.remove('bounce');
+      void bar.offsetWidth;
+      bar.classList.add('bounce');
+    }
   } else {
     bar.classList.remove('show');
+    bar.classList.remove('bounce');
   }
 }
 
