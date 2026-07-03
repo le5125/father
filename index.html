@@ -6587,7 +6587,7 @@ async function loadMerchantInfo(preloaded) {
 
     isBusinessClosed = checkBusinessStatus();
     updateStatusDisplay();
-    if (isBusinessClosed) showClosedOverlay();
+    syncOrderStopOverlay_();
 
     storeData = merchantInfo;
     try { void orderEnsureStorePromotionsFetchedAtLeastOnce_(); } catch (eSp) { /* 略 */ }
@@ -6614,12 +6614,33 @@ function updateStatusDisplay() {
   }
 }
 
-function showClosedOverlay() {
+function showClosedOverlay(title, sub) {
   try { if (typeof Swal !== 'undefined') Swal.close(); } catch (eSw) {}
-  /* 顧客端遮罩只在 POS 端手動切到「休息中」時觸發；統一文案 */
-  document.getElementById('closed-title').textContent = '暫不接單';
-  document.getElementById('closed-sub').textContent   = '謝謝光臨';
+  document.getElementById('closed-title').textContent = title || '暫不接單';
+  document.getElementById('closed-sub').textContent   = sub != null ? sub : '謝謝光臨';
   document.getElementById('closed-overlay').classList.add('show');
+}
+
+function hideClosedOverlay() {
+  document.getElementById('closed-overlay').classList.remove('show');
+}
+
+function orderAreAllProductsSoldOut_() {
+  var list = allProducts || [];
+  if (!list.length) return false;
+  return list.every(function (p) { return p && p.isSoldOut; });
+}
+
+function syncOrderStopOverlay_() {
+  if (isBusinessClosed || window.__ORDER_VACATION_BLOCK__) {
+    showClosedOverlay('暫不接單', '謝謝光臨');
+    return;
+  }
+  if (orderAreAllProductsSoldOut_()) {
+    showClosedOverlay('停止接單', '');
+    return;
+  }
+  hideClosedOverlay();
 }
 
 let _menuCategoryOrder = []; // 從後端取得的菜單名稱排序
@@ -6841,6 +6862,7 @@ async function loadMenuData_() {
       }
       orderPersistMenuPayload_(nextPayload);
       orderMarkMenuReady_();
+      syncOrderStopOverlay_();
     } catch (err) {
       console.error('❌ loadMenu 失敗:', err);
     }
@@ -7106,6 +7128,7 @@ function renderMenu() {
 
   _cacheScrollRefs();
   orderUpdateSectionTitleHighlight_(0);
+  syncOrderStopOverlay_();
 }
 
 function renderMenuCard(item) {
